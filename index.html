@@ -3,14 +3,15 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>เก็บค่าห้อง</title>
+<title>เก็บค่าห้อง · Real-time & OCR</title>
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <style>
 :root{--bg:#f3f6f4;--card:#fff;--ink:#1d2b26;--mute:#6b7a73;--line:#dbe4df;--main:#1f6f5c;--ok:#1f6f5c;--warn:#c2410c;--over:#1d4ed8}
 @media(prefers-color-scheme:dark){:root{--bg:#121816;--card:#1b2420;--ink:#e8f0ec;--mute:#93a39b;--line:#2c3933;--main:#4cc2a1;--ok:#4cc2a1;--warn:#fb923c;--over:#7aa2ff}}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font-family:'Sarabun',system-ui,sans-serif;line-height:1.5}
-main{max-width:720px;margin:0 auto;padding:24px 16px 48px}
+main{max-width:720px;margin:0 auto;padding:24px 16px 64px}
 h1{font-size:1.9rem;font-weight:800;margin:0 0 4px}
 .sub{color:var(--mute);margin:0 0 20px}
 .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:16px}
@@ -50,7 +51,8 @@ summary{cursor:pointer;color:var(--mute);font-size:.88rem}
 .slip-thumb{width:54px;height:54px;object-fit:cover;border-radius:6px;border:1px solid var(--line);cursor:pointer;flex:0 0 auto}
 .nohist{color:var(--mute);font-size:.88rem;padding:6px 0}
 .empty{color:var(--mute);text-align:center;padding:20px 0}
-.foot{display:flex;justify-content:space-between;align-items:center;gap:10px;color:var(--mute);font-size:.85rem}
+.foot{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;color:var(--mute);font-size:.85rem}
+.ocr-hint{font-size:.82rem;color:var(--main);margin-top:4px;min-height:1.2em}
 
 .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;padding:16px;z-index:50}
 .modal-bg.open{display:flex}
@@ -64,12 +66,20 @@ summary{cursor:pointer;color:var(--mute);font-size:.88rem}
 .lb-bg{position:fixed;inset:0;background:rgba(0,0,0,.85);display:none;align-items:center;justify-content:center;padding:16px;z-index:60}
 .lb-bg.open{display:flex}
 .lb-bg img{max-width:95vw;max-height:90vh;border-radius:10px;box-shadow:0 8px 28px rgba(0,0,0,.5)}
+
+/* แจ้งเตือนเรียลไทม์มุมขวาบน */
+.toast-wrap{position:fixed;top:16px;right:16px;display:flex;flex-direction:column;gap:8px;z-index:80;max-width:min(360px,calc(100vw - 32px))}
+.toast{background:var(--card);border:1px solid var(--main);border-left:5px solid var(--main);border-radius:10px;padding:10px 14px;box-shadow:0 8px 24px rgba(0,0,0,.18);font-size:.9rem;animation:fadeIn .2s ease}
+.toast b{display:block;color:var(--main);margin-bottom:2px}
+@keyframes fadeIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
 </style>
 </head>
 <body>
+<div class="toast-wrap" id="toasts" aria-live="polite"></div>
+
 <main>
   <h1>เก็บค่าห้อง</h1>
-  <p class="sub">บันทึกการจ่ายแต่ละครั้ง แยกตามเดือน ข้อมูลเก็บในเบราว์เซอร์เครื่องนี้ · เวอร์ชัน sync-9</p>
+  <p class="sub">ซิงก์เรียลไทม์ แจ้งเตือนการจ่าย และอ่านยอดจากสลิปอัตโนมัติ · เวอร์ชัน sync-11</p>
 
   <section class="card">
     <div class="mnav">
@@ -98,15 +108,25 @@ summary{cursor:pointer;color:var(--mute);font-size:.88rem}
   <section class="card">
     <div class="row">
       <div class="f" style="flex:2"><label for="name">ชื่อ</label><input id="name" placeholder="เช่น นิว"></div>
-      <div class="f"><label for="amt">จ่ายมาแล้ว (บาท)</label><input id="amt" type="number" min="0" value="0"></div>
-      <div class="f" style="flex:1.6"><label for="addSlip">แนบรูปสลิป (ถ้ามี)</label><input id="addSlip" type="file" accept="image/*"></div>
+      <div class="f">
+        <label for="amt">จ่ายมาแล้ว (บาท)</label>
+        <input id="amt" type="number" min="0" step="any" value="0">
+        <div class="ocr-hint" id="addOcrHint"></div>
+      </div>
+      <div class="f" style="flex:1.6"><label for="addSlip">แนบรูปสลิป (อ่านยอดให้อาจะไม่ตรงแต่กำลังพัฒนาอยู่)</label><input id="addSlip" type="file" accept="image/*"></div>
       <button class="p" id="add" type="button">เพิ่มคน</button>
     </div>
   </section>
 
   <section class="card" id="list"></section>
 
-  <div class="foot"><span id="status"></span><button id="reset" type="button">ล้างยอดเดือนนี้</button></div>
+  <div class="foot">
+    <span id="status"></span>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button id="soundBtn" type="button">🔔 เสียงเตือน: เปิด</button>
+      <button id="reset" type="button">ล้างยอดเดือนนี้</button>
+    </div>
+  </div>
 </main>
 
 <div class="modal-bg" id="payModal" role="dialog" aria-modal="true" aria-labelledby="payTitle">
@@ -115,9 +135,10 @@ summary{cursor:pointer;color:var(--mute);font-size:.88rem}
     <div class="modal-field">
       <label for="payAmt">ยอดที่จ่ายเพิ่ม (บาท)</label>
       <input id="payAmt" type="number" min="0" step="any">
+      <div class="ocr-hint" id="payOcrHint"></div>
     </div>
     <div class="modal-field">
-      <label for="paySlip">แนบรูปสลิป / หลักฐาน (ไม่บังคับ)</label>
+      <label for="paySlip">แนบรูปสลิป / หลักฐาน (อ่านยอดให้อัตโนมัติ)</label>
       <input id="paySlip" type="file" accept="image/*">
       <div class="preview-box" id="payPreviewBox">
         <img id="payPreviewImg" alt="ตัวอย่างรูปสลิป">
@@ -142,6 +163,8 @@ let state = { rent: 3000, rents: {}, month: '', people: [], pay: {} };
 const openDetails = new Set();
 let pendingPayUserId = null;
 let pendingPayImg = '';
+let soundEnabled = true;
+let initializedStream = false;
 
 const DB_URL = 'https://money-6f16c-default-rtdb.asia-southeast1.firebasedatabase.app';
 const DB_PATH = '/rent2.json';
@@ -160,9 +183,9 @@ const RANKS = [
 ];
 function personScore(id){
   let s = 0;
-  Object.entries(state.pay).forEach(([m, byId]) => {
-    const paid = ((byId||{})[id]||[]).reduce((t,x)=>t+x.a, 0);
-    const rent = state.rents[m] ?? state.rent;
+  Object.entries(state.pay || {}).forEach(([m, byId]) => {
+    const paid = (((byId || {})[id]) || []).reduce((t, x) => t + (Number(x && x.a) || 0), 0);
+    const rent = (state.rents && state.rents[m] !== undefined) ? state.rents[m] : state.rent;
     if (RANK_BY === 'total') s += paid;
     else if (rent > 0 && paid >= rent) s += 1;
   });
@@ -182,20 +205,57 @@ const BACKGROUND = {
   image: '833172029_1087972224142531_5479026980495393506_n.jpg',
 };
 function applyBackground(){
-  const dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const dark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
   const color = dark ? BACKGROUND.dark : BACKGROUND.light;
   document.body.style.background = BACKGROUND.image
     ? 'url("' + BACKGROUND.image + '") center / cover fixed no-repeat, ' + color
     : color;
 }
-window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyBackground);
+if (window.matchMedia) {
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyBackground);
+}
 /* ================================================================ */
 
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,6);
 const nowMonth = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0'); };
-const fmt = n => Number(n).toLocaleString('th-TH');
+const fmt = n => Number(n || 0).toLocaleString('th-TH');
+const monthLabelTH = m => {
+  const [y, mo] = m.split('-').map(Number);
+  return new Date(y, (mo || 1) - 1, 1).toLocaleDateString('th-TH', { month:'long', year:'numeric' });
+};
 
-function compressImage(file, maxWidth = 640, quality = 0.68){
+function playBeep(){
+  if (!soundEnabled) return;
+  try {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(784, ctx.currentTime);
+    gain.gain.setValueAtTime(0.08, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.25);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.26);
+  } catch(e){}
+}
+
+function showToast(title, body){
+  const wrap = $('toasts');
+  const el = document.createElement('div');
+  el.className = 'toast';
+  el.innerHTML = '<b></b><span></span>';
+  el.querySelector('b').textContent = title;
+  el.querySelector('span').textContent = body;
+  wrap.appendChild(el);
+  playBeep();
+  setTimeout(() => { el.remove(); }, 6500);
+}
+
+function compressImage(file, maxWidth = 600, quality = 0.65){
   return new Promise((resolve, reject) => {
     if (!file) return resolve('');
     if (file.type && !file.type.startsWith('image/')) return reject(new Error('กรุณาเลือกไฟล์รูปภาพ'));
@@ -223,6 +283,54 @@ function compressImage(file, maxWidth = 640, quality = 0.68){
   });
 }
 
+// อ่านตัวเลขยอดเงินจากรูปสลิปด้วย Tesseract OCR
+function extractAmountFromText(rawText){
+  if (!rawText) return null;
+  const cleaned = rawText
+    .replace(/บาท|THB|฿|จำนวนเงิน|ยอดโอน|ยอดเงิน/gi, ' ')
+    .replace(/O(?=\d)/g, '0')
+    .replace(/(?<=\d)O/g, '0');
+
+  // จับตัวเลขที่มีทศนิยมหรือคั่นหลักพัน เช่น 1,500.00 หรือ 3000 หรือ 1250.50
+  const matches = [...cleaned.matchAll(/\b(\d{1,3}(?:,\d{3})+|\d+)(?:\.(\d{1,2}))?\b/g)];
+  const candidates = [];
+  for (const m of matches){
+    const intPart = Number(m[1].replace(/,/g, ''));
+    const decPart = m[2] ? Number('0.' + m[2]) : 0;
+    const val = intPart + decPart;
+    // กรองปี พ.ศ./ค.ศ. 4 หลักล้วนๆ ที่ไม่มีจุดทศนิยมและไม่มีคอมม่า ถ้ามีตัวเลือกอื่น
+    if (val > 0 && val < 1000000){
+      const isPlainYear = !m[1].includes(',') && !m[2] && val >= 2500 && val <= 2575;
+      candidates.push({ val, isPlainYear, hasDecimalOrComma: Boolean(m[2] || m[1].includes(',')) });
+    }
+  }
+  if (!candidates.length) return null;
+  // ให้ความสำคัญกับเลขที่มีทศนิยม/คอมม่า หรือไม่ใช่เลขปี พ.ศ.
+  const filtered = candidates.filter(c => !c.isPlainYear);
+  const pool = filtered.length ? filtered : candidates;
+  const decimalPool = pool.filter(c => c.hasDecimalOrComma);
+  const best = (decimalPool.length ? decimalPool : pool).sort((a, b) => b.val - a.val)[0];
+  return Number.isInteger(best.val) ? best.val : Number(best.val.toFixed(2));
+}
+
+async function readSlipAmount(dataUrl, hintEl, amtInput){
+  if (!window.Tesseract || !dataUrl) return;
+  hintEl.textContent = 'กำลังอ่านยอดเงินจากสลิป...';
+  try {
+    const res = await window.Tesseract.recognize(dataUrl, 'tha+eng');
+    const txt = (res && res.data && res.data.text) || '';
+    const amount = extractAmountFromText(txt);
+    if (amount !== null && amount > 0){
+      amtInput.value = amount;
+      hintEl.textContent = 'อ่านยอดจากสลิปได้ ' + fmt(amount) + ' บาท (แก้ได้)';
+    } else {
+      hintEl.textContent = 'อ่านยอดอัตโนมัติไม่ชัด กรุณากรอกยอดเงินเอง';
+    }
+  } catch(e){
+    hintEl.textContent = 'อ่านสลิปไม่สำเร็จ กรุณากรอกยอดเงินเอง';
+  }
+}
+
 function openLightbox(src){
   if (!src) return;
   $('lightboxImg').src = src;
@@ -231,9 +339,9 @@ function openLightbox(src){
 $('lightbox').addEventListener('click', () => $('lightbox').classList.remove('open'));
 
 function normalize(s){
-  s = s || {};
-  const out = { rent: Number(s.rent)||0, rents: s.rents||{}, month: s.month||'', people: [], pay: {} };
-  const ppl = Array.isArray(s.people) ? s.people.filter(Boolean) : Object.values(s.people||{});
+  s = (s && typeof s === 'object') ? s : {};
+  const out = { rent: Number(s.rent) || 0, rents: (s.rents && typeof s.rents === 'object') ? s.rents : {}, month: s.month || '', people: [], pay: {} };
+  const ppl = Array.isArray(s.people) ? s.people.filter(Boolean) : Object.values(s.people || {}).filter(Boolean);
   const m = out.month || nowMonth();
   ppl.forEach(p => {
     const id = p.id || uid();
@@ -243,18 +351,21 @@ function normalize(s){
       out.pay[m][id] = [{ a: Number(p.paid), t: Date.now() }];
     }
   });
-  Object.entries(s.pay||{}).forEach(([mo, byId]) => {
+  Object.entries(s.pay || {}).forEach(([mo, byId]) => {
+    if (!byId || typeof byId !== 'object') return;
     out.pay[mo] = out.pay[mo] || {};
-    Object.entries(byId||{}).forEach(([id, arr]) => {
-      out.pay[mo][id] = (Array.isArray(arr) ? arr : Object.values(arr||{})).filter(Boolean).map(item => ({
-        a: Number(item.a) || 0,
-        t: Number(item.t) || Date.now(),
-        ...(item.img ? { img: item.img } : {})
+    Object.entries(byId).forEach(([id, arr]) => {
+      const list = Array.isArray(arr) ? arr : Object.values(arr || {});
+      out.pay[mo][id] = list.filter(Boolean).map(item => ({
+        a: Number(item && item.a) || 0,
+        t: Number(item && item.t) || Date.now(),
+        ...(item && item.img ? { img: String(item.img) } : {})
       }));
     });
   });
   return out;
 }
+
 function load(){
   try {
     const s = localStorage.getItem(KEY) || localStorage.getItem(OLD_KEY);
@@ -262,52 +373,122 @@ function load(){
   } catch(e){}
   if (!state.month) state.month = nowMonth();
 }
+
 let dirty = 0;
 function errMsg(e){
   if (e === 401 || e === 403) return 'Firebase ไม่อนุญาต (' + e + ') ไปตั้ง Rules ให้ read/write เป็น true';
   if (e === 404) return 'ไม่พบฐานข้อมูล ตรวจลิงก์ DB_URL';
   return 'ออนไลน์ไม่ได้ (' + ((e && e.message) || e) + ')';
 }
+function setStatus(t){ $('status').textContent = t; }
+
+// ตรวจจับการจ่ายเงินที่เพิ่มขึ้นเมื่อมีข้อมูลใหม่เข้ามา เพื่อแจ้งเตือนผู้ใช้
+function notifyNewPayments(prevState, nextState){
+  if (!initializedStream) return;
+  const pplMap = new Map((nextState.people || []).map(p => [p.id, p.name]));
+  const allMonths = new Set([...Object.keys(prevState.pay || {}), ...Object.keys(nextState.pay || {})]);
+
+  allMonths.forEach(m => {
+    const prevById = (prevState.pay && prevState.pay[m]) || {};
+    const nextById = (nextState.pay && nextState.pay[m]) || {};
+    const rent = (nextState.rents && nextState.rents[m] !== undefined) ? nextState.rents[m] : nextState.rent;
+
+    Object.entries(nextById).forEach(([id, nextArr]) => {
+      const prevArr = prevById[id] || [];
+      const prevSum = prevArr.reduce((s, x) => s + (Number(x && x.a) || 0), 0);
+      const nextSum = (nextArr || []).reduce((s, x) => s + (Number(x && x.a) || 0), 0);
+      if (nextSum > prevSum){
+        const added = nextSum - prevSum;
+        const name = pplMap.get(id) || 'สมาชิก';
+        const fullText = (rent > 0 && nextSum >= rent) ? ' · จ่ายครบเดือนนี้แล้ว!' : '';
+        showToast(
+          'มีการจ่ายเงินใหม่ (' + monthLabelTH(m) + ')',
+          name + ' จ่ายเพิ่ม +' + fmt(added) + ' บาท (รวมเดือนนี้ ' + fmt(nextSum) + ' บาท)' + fullText
+        );
+      }
+    });
+  });
+}
+
+function applyRemoteData(d){
+  if (!d || d.error) return;
+  const n = normalize(d);
+  n.month = state.month;
+  const prevSnapshot = JSON.parse(JSON.stringify(state));
+  if (JSON.stringify(n) !== JSON.stringify(normalize(state))){
+    notifyNewPayments(prevSnapshot, n);
+    state = n;
+    try { localStorage.setItem(KEY, JSON.stringify(state)); } catch(e){}
+    render();
+  }
+  initializedStream = true;
+}
+
 function save(){
   try { localStorage.setItem(KEY, JSON.stringify(state)); }
   catch(e){ alert('พื้นที่เก็บข้อมูลในเบราว์เซอร์เต็ม อาจเกิดจากรูปที่แนบมีขนาดใหญ่เกินไป'); }
   if (!DB_URL) return;
   dirty++;
+  setStatus('กำลังบันทึกเรียลไทม์...');
   fetch(DB_URL + DB_PATH, { method:'PUT', body: JSON.stringify(state) })
-    .then(r => { if (!r.ok) throw r.status; setStatus('บันทึกออนไลน์แล้ว'); })
+    .then(r => { if (!r.ok) throw r.status; setStatus('เรียลไทม์: บันทึกล่าสุดแล้ว'); })
     .catch(e => setStatus(errMsg(e)))
-    .finally(() => { dirty--; });
+    .finally(() => { dirty = Math.max(0, dirty - 1); });
 }
-function setStatus(t){ $('status').textContent = t; }
-const sj = o => JSON.stringify(o, (k, v) => v && typeof v === 'object' && !Array.isArray(v)
-  ? Object.fromEntries(Object.entries(v).sort(([x],[y]) => x < y ? -1 : 1)) : v);
+
 async function pull(){
-  if (!DB_URL || dirty) return;
+  if (!DB_URL || dirty > 0) return;
   try {
     const r = await fetch(DB_URL + DB_PATH);
     if (!r.ok) throw r.status;
     const d = await r.json();
-    if (dirty) return;
+    if (dirty > 0) return;
     if (d && !d.error){
-      const n = normalize(d); n.month = state.month;
-      if (sj(n) !== sj(normalize(state))){
-        state = n;
-        try { localStorage.setItem(KEY, JSON.stringify(state)); } catch(e){}
-        render();
-      }
-    } else if (!d && state.people.length){ save(); return; }
-    setStatus('เชื่อมต่อออนไลน์อยู่ ทุกคนเห็นข้อมูลเดียวกัน');
+      applyRemoteData(d);
+    } else if (!d && state.people.length){
+      initializedStream = true;
+      save();
+      return;
+    } else {
+      initializedStream = true;
+    }
+    setStatus('เรียลไทม์ออนไลน์อยู่ · เตือนอัตโนมัติเมื่อมียอดเข้า');
   } catch(e){ setStatus(errMsg(e)); }
 }
 
-const curRent = () => state.rents[state.month] ?? state.rent;
-const pays = id => ((state.pay[state.month]||{})[id]) || [];
-const paidOf = id => pays(id).reduce((s,x)=>s+x.a, 0);
-const rentOf = m => state.rents[m] ?? state.rent;
-const paidIn = (m, id) => (((state.pay[m]||{})[id]) || []).reduce((s,x)=>s+x.a, 0);
-function nextM(m){ const [y,mo] = m.split('-').map(Number); const d = new Date(y, mo, 1); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0'); }
+// เชื่อมต่อ Firebase Realtime Database แบบ SSE Streaming เพื่อรับอัปเดตทันที
+function startRealtimeStream(){
+  if (!DB_URL || typeof EventSource === 'undefined') return;
+  try {
+    const es = new EventSource(DB_URL + DB_PATH);
+    es.addEventListener('put', ev => {
+      if (dirty > 0) return;
+      try {
+        const payload = JSON.parse(ev.data);
+        if (payload.path === '/'){
+          applyRemoteData(payload.data);
+        } else {
+          pull();
+        }
+      } catch(e){}
+    });
+    es.addEventListener('patch', () => {
+      if (dirty <= 0) pull();
+    });
+    es.onerror = () => {
+      // พึ่งพา pull สำรองเมื่อเครือข่ายสะดุด
+    };
+  } catch(e){}
+}
+
+const curRent = () => (state.rents && state.rents[state.month] !== undefined) ? state.rents[state.month] : state.rent;
+const pays = id => (((state.pay || {})[state.month] || {})[id]) || [];
+const paidOf = id => pays(id).reduce((s, x) => s + (Number(x && x.a) || 0), 0);
+const rentOf = m => (state.rents && state.rents[m] !== undefined) ? state.rents[m] : state.rent;
+const paidIn = (m, id) => ((((state.pay || {})[m] || {})[id]) || []).reduce((s, x) => s + (Number(x && x.a) || 0), 0);
+function nextM(m){ const [y, mo] = m.split('-').map(Number); const d = new Date(y, mo, 1); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0'); }
 function creditIn(id, month){
-  const ms = Object.keys(state.pay).filter(m => paidIn(m, id) > 0).sort();
+  const ms = Object.keys(state.pay || {}).filter(m => paidIn(m, id) > 0).sort();
   if (!ms.length || ms[0] >= month) return 0;
   let c = 0, m = ms[0], n = 0;
   while (m < month && n++ < 600){ c = Math.max(0, c + paidIn(m, id) - rentOf(m)); m = nextM(m); }
@@ -316,9 +497,9 @@ function creditIn(id, month){
 const totalOf = id => paidOf(id) + creditIn(id, state.month);
 function addPay(id, a, img = ''){
   const m = state.month;
-  state.rents[m] = state.rents[m] ?? state.rent;
+  state.rents[m] = (state.rents[m] !== undefined) ? state.rents[m] : state.rent;
   state.pay[m] = state.pay[m] || {};
-  const entry = { a, t: Date.now() };
+  const entry = { a: Number(a) || 0, t: Date.now() };
   if (img) entry.img = img;
   (state.pay[m][id] = state.pay[m][id] || []).push(entry);
 }
@@ -335,69 +516,95 @@ function shift(d){
 }
 
 function render(){
-  const [y, mo] = state.month.split('-').map(Number);
-  $('mlabel').textContent = new Date(y, mo-1, 1).toLocaleDateString('th-TH', { month:'long', year:'numeric' });
-  $('month').value = state.month;
-  if (document.activeElement !== $('rent')) $('rent').value = curRent();
+  try {
+    const [y, mo] = state.month.split('-').map(Number);
+    $('mlabel').textContent = new Date(y, mo-1, 1).toLocaleDateString('th-TH', { month:'long', year:'numeric' });
+    $('month').value = state.month;
+    if (document.activeElement !== $('rent')) $('rent').value = curRent();
 
-  const rent = curRent(), ppl = state.people;
-  const got = ppl.reduce((s,p)=>s+totalOf(p.id),0);
-  $('carry').textContent = fmt(ppl.reduce((s,p)=>s+creditIn(p.id,state.month),0));
-  const need = rent * ppl.length;
-  const done = ppl.filter(p=>totalOf(p.id)>=rent).length;
-  $('got').textContent = fmt(got) + ' บาท';
-  $('need').textContent = fmt(need);
-  $('left').textContent = fmt(Math.max(need-got,0));
-  $('done').textContent = done + '/' + ppl.length;
-  $('fill').style.width = need ? Math.min(got/need*100,100)+'%' : '0';
+    const rent = curRent(), ppl = state.people;
+    const got = ppl.reduce((s, p) => s + totalOf(p.id), 0);
+    $('carry').textContent = fmt(ppl.reduce((s, p) => s + creditIn(p.id, state.month), 0));
+    const need = rent * ppl.length;
+    const done = ppl.filter(p => totalOf(p.id) >= rent).length;
+    $('got').textContent = fmt(got) + ' บาท';
+    $('need').textContent = fmt(need);
+    $('left').textContent = fmt(Math.max(need - got, 0));
+    $('done').textContent = done + '/' + ppl.length;
+    $('fill').style.width = need ? Math.min(got / need * 100, 100) + '%' : '0';
 
-  const list = $('list');
-  if (!ppl.length){ list.innerHTML = '<div class="empty">ยังไม่มีรายชื่อ เพิ่มคนแรกด้านบนได้เลย</div>'; return; }
-  list.innerHTML = '';
-  ppl.forEach(p => {
-    const paid = paidOf(p.id), cr = creditIn(p.id, state.month), diff = rent - paid - cr, hist = pays(p.id);
-    const slipCount = hist.filter(x => x.img).length;
-    let cls='t-warn', txt='ค้าง '+fmt(diff)+' บาท';
-    if (diff===0){cls='t-ok';txt='จ่ายครบ';}
-    else if (diff<0){cls='t-over';txt='เกิน '+fmt(-diff)+' บาท (ยกไปเดือนหน้า)';}
-    const el = document.createElement('div');
-    el.className = 'item';
-    el.innerHTML = '<div class="top"><div class="nm"><strong></strong><span>จ่ายแล้ว '+fmt(paid)+(cr ? ' + ยกมา '+fmt(cr) : '')+' จาก '+fmt(rent)+' บาท</span></div>'
-      + '<span class="tag '+cls+'">'+txt+'</span>'
-      + '<div class="acts"><button type="button" data-a="pay" data-id="'+p.id+'">จ่ายเพิ่ม</button><button type="button" data-a="del" data-id="'+p.id+'" aria-label="ลบคน">ลบ</button></div></div>'
-      + '<details'+(openDetails.has(p.id)?' open':'')+' data-id="'+p.id+'"><summary>ประวัติการจ่าย ('+hist.length+' ครั้ง'+(slipCount ? ' · มีรูป '+slipCount : '')+')</summary><div class="hl"></div></details>';
-    const sc = personScore(p.id), rk = rankOf(sc);
-    const st = el.querySelector('strong');
-    st.textContent = p.name;
-    const badge = document.createElement('span');
-    badge.className = 'rank';
-    badge.textContent = rk.cur.icon + ' ' + rk.cur.name;
-    badge.style.color = rk.cur.color;
-    st.appendChild(badge);
-    const info = document.createElement('span');
-    info.className = 'rk';
-    info.textContent = 'คะแนน ' + fmt(sc) + ' ' + RANK_UNIT + (rk.next ? ' · อีก ' + fmt(rk.next.min - sc) + ' ' + RANK_UNIT + ' ถึงยศ ' + rk.next.name : ' · ยศสูงสุดแล้ว');
-    el.querySelector('.nm').appendChild(info);
-    const hl = el.querySelector('.hl');
-    if (!hist.length) hl.innerHTML = '<div class="nohist">ยังไม่มีรายการจ่ายในเดือนนี้</div>';
-    hist.forEach((x, k) => {
-      const r = document.createElement('div');
-      r.className = 'h';
-      r.innerHTML = '<span class="d"></span><b></b>'
-        + (x.img ? '<img class="slip-thumb" alt="สลิปการจ่าย" title="คลิกเพื่อดูรูปเต็ม"><button type="button" data-a="delimg" data-id="'+p.id+'" data-k="'+k+'" aria-label="ลบรูป">ลบรูป</button>' : '')
-        + '<button type="button" data-a="rm" data-id="'+p.id+'" data-k="'+k+'" aria-label="ลบรายการนี้">ลบ</button>';
-      r.querySelector('.d').textContent = fdate(x.t);
-      r.querySelector('b').textContent = '+' + fmt(x.a) + ' บาท';
-      if (x.img){
-        const thumb = r.querySelector('.slip-thumb');
-        thumb.src = x.img;
-        thumb.addEventListener('click', () => openLightbox(x.img));
-      }
-      hl.appendChild(r);
+    const list = $('list');
+    if (!ppl.length){ list.innerHTML = '<div class="empty">ยังไม่มีรายชื่อ เพิ่มคนแรกด้านบนได้เลย</div>'; return; }
+    list.innerHTML = '';
+    ppl.forEach(p => {
+      const paid = paidOf(p.id), cr = creditIn(p.id, state.month), diff = rent - paid - cr, hist = pays(p.id);
+      const slipCount = hist.filter(x => x && x.img).length;
+      let cls = 't-warn', txt = 'ค้าง ' + fmt(diff) + ' บาท';
+      if (diff === 0){ cls = 't-ok'; txt = 'จ่ายครบ'; }
+      else if (diff < 0){ cls = 't-over'; txt = 'เกิน ' + fmt(-diff) + ' บาท (ยกไปเดือนหน้า)'; }
+      const el = document.createElement('div');
+      el.className = 'item';
+      el.innerHTML = '<div class="top"><div class="nm"><strong></strong><span>จ่ายแล้ว ' + fmt(paid) + (cr ? ' + ยกมา ' + fmt(cr) : '') + ' จาก ' + fmt(rent) + ' บาท</span></div>'
+        + '<span class="tag ' + cls + '">' + txt + '</span>'
+        + '<div class="acts"><button type="button" data-a="pay" data-id="' + p.id + '">จ่ายเพิ่ม</button><button type="button" data-a="del" data-id="' + p.id + '" aria-label="ลบคน">ลบ</button></div></div>'
+        + '<details' + (openDetails.has(p.id) ? ' open' : '') + ' data-id="' + p.id + '"><summary>ประวัติการจ่าย (' + hist.length + ' ครั้ง' + (slipCount ? ' · มีรูป ' + slipCount : '') + ')</summary><div class="hl"></div></details>';
+      const sc = personScore(p.id), rk = rankOf(sc);
+      const st = el.querySelector('strong');
+      st.textContent = p.name;
+      const badge = document.createElement('span');
+      badge.className = 'rank';
+      badge.textContent = rk.cur.icon + ' ' + rk.cur.name;
+      badge.style.color = rk.cur.color;
+      st.appendChild(badge);
+      const info = document.createElement('span');
+      info.className = 'rk';
+      info.textContent = 'คะแนน ' + fmt(sc) + ' ' + RANK_UNIT + (rk.next ? ' · อีก ' + fmt(rk.next.min - sc) + ' ' + RANK_UNIT + ' ถึงยศ ' + rk.next.name : ' · ยศสูงสุดแล้ว');
+      el.querySelector('.nm').appendChild(info);
+      const hl = el.querySelector('.hl');
+      if (!hist.length) hl.innerHTML = '<div class="nohist">ยังไม่มีรายการจ่ายในเดือนนี้</div>';
+      hist.forEach((x, k) => {
+        const r = document.createElement('div');
+        r.className = 'h';
+        r.innerHTML = '<span class="d"></span><b></b>'
+          + (x.img ? '<img class="slip-thumb" alt="สลิปการจ่าย" title="คลิกเพื่อดูรูปเต็ม"><button type="button" data-a="delimg" data-id="' + p.id + '" data-k="' + k + '" aria-label="ลบรูป">ลบรูป</button>' : '')
+          + '<button type="button" data-a="rm" data-id="' + p.id + '" data-k="' + k + '" aria-label="ลบรายการนี้">ลบ</button>';
+        r.querySelector('.d').textContent = fdate(x.t);
+        r.querySelector('b').textContent = '+' + fmt(x.a) + ' บาท';
+        if (x.img){
+          const thumb = r.querySelector('.slip-thumb');
+          thumb.src = x.img;
+          thumb.addEventListener('click', () => openLightbox(x.img));
+        }
+        hl.appendChild(r);
+      });
+      list.appendChild(el);
     });
-    list.appendChild(el);
-  });
+  } catch (err) {
+    console.error(err);
+    setStatus('เกิดข้อผิดพลาดในการแสดงผล: ' + (err && err.message || err));
+  }
 }
+
+let pendingAddSlipImg = '';
+$('addSlip').addEventListener('change', e => {
+  const file = e.target.files && e.target.files[0];
+  if (!file){
+    pendingAddSlipImg = '';
+    $('addOcrHint').textContent = '';
+    return;
+  }
+  compressImage(file)
+    .then(img => {
+      pendingAddSlipImg = img;
+      return readSlipAmount(img, $('addOcrHint'), $('amt'));
+    })
+    .catch(err => {
+      alert(err.message || 'แนบรูปไม่สำเร็จ');
+      $('addSlip').value = '';
+      pendingAddSlipImg = '';
+      $('addOcrHint').textContent = '';
+    });
+});
 
 function finishAddPerson(name, a, img){
   const id = uid();
@@ -406,9 +613,11 @@ function finishAddPerson(name, a, img){
   $('name').value = '';
   $('amt').value = 0;
   $('addSlip').value = '';
+  $('addOcrHint').textContent = '';
+  pendingAddSlipImg = '';
   $('name').focus();
-  save();
   render();
+  save();
 }
 
 $('add').addEventListener('click', () => {
@@ -420,13 +629,21 @@ $('add').addEventListener('click', () => {
   }
   const a = Math.max(0, Number($('amt').value) || 0);
   const file = $('addSlip').files && $('addSlip').files[0];
+  if (pendingAddSlipImg){
+    finishAddPerson(name, a, pendingAddSlipImg);
+    return;
+  }
   if (!file){
     finishAddPerson(name, a, '');
     return;
   }
+  setStatus('กำลังย่อรูปสลิป...');
   compressImage(file)
     .then(img => finishAddPerson(name, a, img))
-    .catch(err => alert(err.message || 'แนบรูปไม่สำเร็จ'));
+    .catch(err => {
+      alert(err.message || 'แนบรูปไม่สำเร็จ');
+      setStatus('แนบรูปไม่สำเร็จ');
+    });
 });
 $('name').addEventListener('keydown', e => { if (e.key === 'Enter') $('add').click(); });
 
@@ -438,6 +655,7 @@ function openPayModal(userId){
   const left = curRent() - totalOf(userId);
   $('payTitle').textContent = 'บันทึกการจ่ายของ ' + p.name;
   $('payAmt').value = left > 0 ? left : 0;
+  $('payOcrHint').textContent = '';
   $('paySlip').value = '';
   $('payPreviewImg').src = '';
   $('payPreviewBox').style.display = 'none';
@@ -447,6 +665,7 @@ function openPayModal(userId){
 function closePayModal(){
   pendingPayUserId = null;
   pendingPayImg = '';
+  $('payOcrHint').textContent = '';
   $('payModal').classList.remove('open');
 }
 $('payCancel').addEventListener('click', closePayModal);
@@ -455,6 +674,7 @@ $('paySlip').addEventListener('change', e => {
   const file = e.target.files && e.target.files[0];
   if (!file){
     pendingPayImg = '';
+    $('payOcrHint').textContent = '';
     $('payPreviewBox').style.display = 'none';
     return;
   }
@@ -463,11 +683,13 @@ $('paySlip').addEventListener('change', e => {
       pendingPayImg = img;
       $('payPreviewImg').src = img;
       $('payPreviewBox').style.display = 'block';
+      return readSlipAmount(img, $('payOcrHint'), $('payAmt'));
     })
     .catch(err => {
       alert(err.message || 'แนบรูปไม่สำเร็จ');
       $('paySlip').value = '';
       pendingPayImg = '';
+      $('payOcrHint').textContent = '';
       $('payPreviewBox').style.display = 'none';
     });
 });
@@ -475,20 +697,26 @@ $('paySave').addEventListener('click', () => {
   if (!pendingPayUserId) return;
   const n = Math.max(0, Number($('payAmt').value) || 0);
   if (n <= 0 && !pendingPayImg){
-    alert('กรุณากรอกยอดเงินหรือแนบรูปสลิป');
+    alert('กรุณากรอกยอดเงินหรือแนบรูปสลิปอาจะไม่ตรงแต่กำลังพัฒนาอยู่');
     return;
   }
   addPay(pendingPayUserId, n, pendingPayImg);
   openDetails.add(pendingPayUserId);
   closePayModal();
-  save();
   render();
+  save();
+});
+
+$('soundBtn').addEventListener('click', () => {
+  soundEnabled = !soundEnabled;
+  $('soundBtn').textContent = soundEnabled ? '🔔 เสียงเตือน: เปิด' : '🔕 เสียงเตือน: ปิด';
 });
 
 $('rent').addEventListener('input', e => {
   const v = Math.max(0, Number(e.target.value)||0);
   state.rents[state.month] = v; state.rent = v;
-  save(); render();
+  render();
+  save();
 });
 $('month').addEventListener('change', e => gotoMonth(e.target.value));
 $('prev').addEventListener('click', () => shift(-1));
@@ -499,38 +727,49 @@ $('list').addEventListener('toggle', e => {
 }, true);
 $('list').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b) return;
-  const id = b.dataset.id, p = state.people.find(x=>x.id===id);
+  const id = b.dataset.id, p = state.people.find(x => x.id === id);
   if (!p) return;
-  if (b.dataset.a==='del'){
-    if (confirm('ลบ "'+p.name+'" ออกจากรายชื่อ (ลบประวัติทุกเดือนของคนนี้ด้วย)?')){
-      state.people = state.people.filter(x=>x.id!==id);
-      Object.values(state.pay).forEach(m => delete m[id]);
-      save(); render();
+  if (b.dataset.a === 'del'){
+    if (confirm('ลบ "' + p.name + '" ออกจากรายชื่อ (ลบประวัติทุกเดือนของคนนี้ด้วย)?')){
+      state.people = state.people.filter(x => x.id !== id);
+      Object.values(state.pay || {}).forEach(m => { if (m && typeof m === 'object') delete m[id]; });
+      render();
+      save();
     }
-  } else if (b.dataset.a==='rm'){
+  } else if (b.dataset.a === 'rm'){
     const k = Number(b.dataset.k), x = pays(id)[k];
-    if (x && confirm('ลบรายการจ่าย '+fmt(x.a)+' บาท ของ '+p.name+'?')){
-      state.pay[state.month][id].splice(k,1); save(); render();
+    if (x && confirm('ลบรายการจ่าย ' + fmt(x.a) + ' บาท ของ ' + p.name + '?')){
+      state.pay[state.month][id].splice(k, 1);
+      render();
+      save();
     }
-  } else if (b.dataset.a==='delimg'){
+  } else if (b.dataset.a === 'delimg'){
     const k = Number(b.dataset.k), x = pays(id)[k];
     if (x && x.img && confirm('ลบรูปแนบของรายการนี้?')){
-      delete x.img; save(); render();
+      delete x.img;
+      render();
+      save();
     }
-  } else if (b.dataset.a==='pay'){
+  } else if (b.dataset.a === 'pay'){
     openPayModal(id);
   }
 });
 $('reset').addEventListener('click', () => {
   if (confirm('ล้างยอดการจ่ายของเดือนนี้ทั้งหมด? (รายชื่อและเดือนอื่นไม่หาย)')){
-    delete state.pay[state.month]; save(); render();
+    delete state.pay[state.month];
+    render();
+    save();
   }
 });
 
 load();
 applyBackground();
 render();
-if (DB_URL){ pull(); setInterval(pull, 4000); document.addEventListener('visibilitychange', () => { if (!document.hidden) pull(); }); }
+if (DB_URL){
+  pull().then(() => { startRealtimeStream(); });
+  setInterval(pull, 5000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) pull(); });
+}
 else setStatus('ยังไม่ได้ตั้งค่าออนไลน์ ข้อมูลเก็บในเครื่องนี้เท่านั้น');
 </script>
 </body>
