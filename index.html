@@ -7,58 +7,96 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="เก็บค่าห้อง">
-<title>เก็บค่าห้อง · App</title>
+<title>เก็บค่าห้อง · Multi-UI</title>
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;800&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <style>
-:root{--bg:#f3f6f4;--card:#fff;--ink:#1d2b26;--mute:#6b7a73;--line:#dbe4df;--main:#1f6f5c;--ok:#1f6f5c;--warn:#c2410c;--over:#1d4ed8}
-@media(prefers-color-scheme:dark){:root{--bg:#121816;--card:#1b2420;--ink:#e8f0ec;--mute:#93a39b;--line:#2c3933;--main:#4cc2a1;--ok:#4cc2a1;--warn:#fb923c;--over:#7aa2ff}}
+:root{
+  --bg:#f3f6f4;--card:#fff;--ink:#1d2b26;--mute:#6b7a73;--line:#dbe4df;
+  --main:#1f6f5c;--ok:#1f6f5c;--warn:#c2410c;--over:#1d4ed8;
+  --card-pad:16px;--card-gap:16px;--item-pad:14px;--big-sz:2.2rem
+}
+@media(prefers-color-scheme:dark){
+  :root[data-theme="auto"]{
+    --bg:#121816;--card:#1b2420;--ink:#e8f0ec;--mute:#93a39b;--line:#2c3933;
+    --main:#4cc2a1;--ok:#4cc2a1;--warn:#fb923c;--over:#7aa2ff
+  }
+}
+:root[data-theme="light"]{
+  --bg:#f3f6f4;--card:#fff;--ink:#1d2b26;--mute:#6b7a73;--line:#dbe4df;
+  --main:#1f6f5c;--ok:#1f6f5c;--warn:#c2410c;--over:#1d4ed8
+}
+:root[data-theme="dark"]{
+  --bg:#121816;--card:#1b2420;--ink:#e8f0ec;--mute:#93a39b;--line:#2c3933;
+  --main:#4cc2a1;--ok:#4cc2a1;--warn:#fb923c;--over:#7aa2ff
+}
+:root[data-theme="warm"]{
+  --bg:#f7f1e8;--card:#fffaf3;--ink:#2d221a;--mute:#7a6757;--line:#e6d8c5;
+  --main:#9c5221;--ok:#2e7d5b;--warn:#c2410c;--over:#1d4ed8
+}
+:root[data-layout="compact"]{
+  --card-pad:12px;--card-gap:10px;--item-pad:9px;--big-sz:1.75rem
+}
+
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font-family:'Sarabun',system-ui,sans-serif;line-height:1.5}
 main{max-width:720px;margin:0 auto;padding:24px 16px 64px}
-.head-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
+.head-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:14px}
 h1{font-size:1.9rem;font-weight:800;margin:0 0 4px}
-.sub{color:var(--mute);margin:0 0 20px}
-.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:16px}
+.sub{color:var(--mute);margin:0}
+.ui-bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:var(--card-pad);margin-bottom:var(--card-gap)}
 .row{display:flex;gap:10px;flex-wrap:wrap;align-items:end}
 label{display:block;font-size:.85rem;color:var(--mute);margin-bottom:4px}
-input{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:9px 11px;width:100%}
+input,select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 11px}
+input{width:100%}
+select{padding:7px 10px;font-size:.88rem;cursor:pointer}
 input[type="file"]{padding:7px 9px;font-size:.88rem}
-input:focus,button:focus-visible,summary:focus-visible{outline:2px solid var(--main);outline-offset:1px}
-.f{flex:1;min-width:120px}
-button{font:inherit;cursor:pointer;border-radius:8px;border:1px solid var(--line);background:transparent;color:var(--ink);padding:9px 14px}
+input:focus,select:focus,button:focus-visible,summary:focus-visible{outline:2px solid var(--main);outline-offset:1px}
+.f{flex:1;min-width:140px}
+button{font:inherit;cursor:pointer;border-radius:8px;border:1px solid var(--line);background:transparent;color:var(--ink);padding:9px 14px;white-space:nowrap}
 button.p{background:var(--main);border-color:var(--main);color:#fff;font-weight:600}
 button.install{background:var(--main);border-color:var(--main);color:#fff;font-weight:600;padding:8px 13px;font-size:.9rem}
 .mnav{display:flex;align-items:center;justify-content:space-between;gap:10px}
 .mnav b{font-size:1.2rem}
-.big{font-size:2.2rem;font-weight:800;line-height:1.1}
+.big{font-size:var(--big-sz);font-weight:800;line-height:1.1}
 .bar{height:10px;background:var(--line);border-radius:6px;overflow:hidden;margin:12px 0 6px}
 .bar i{display:block;height:100%;background:var(--main);transition:width .3s}
-.stats{display:flex;gap:24px;flex-wrap:wrap;color:var(--mute);font-size:.92rem}
+.stats{display:flex;gap:16px 24px;flex-wrap:wrap;color:var(--mute);font-size:.92rem}
 .stats b{color:var(--ink)}
-.item{padding:12px 0;border-top:1px solid var(--line)}
+.item{padding:var(--item-pad) 0;border-top:1px solid var(--line)}
 .item:first-child{border-top:0}
-.top{display:flex;align-items:center;gap:12px}
+.top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
 .nm{flex:1;min-width:0}
-.nm strong{display:block;font-size:1.05rem}
-.nm span{font-size:.88rem;color:var(--mute)}
-.nm strong .rank{font-size:.8rem;font-weight:600;padding:1px 9px;border-radius:99px;border:1px solid currentColor;margin-left:6px;white-space:nowrap}
-.nm .rk{display:block}
-.tag{font-size:.82rem;font-weight:600;padding:2px 10px;border-radius:99px;border:1px solid currentColor;white-space:nowrap}
+.nm strong{display:flex;align-items:center;flex-wrap:wrap;gap:6px;font-size:1.08rem}
+.nm strong .rank{font-size:.78rem;font-weight:600;padding:1px 9px;border-radius:99px;border:1px solid currentColor;white-space:nowrap}
+.nm .sum-line,.nm .rk{display:block;font-size:.88rem;color:var(--mute);margin-top:2px}
+:root[data-layout="compact"] .nm .rk{display:none}
+.meta-row{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:8px}
+:root[data-layout="compact"] .meta-row{margin-top:5px}
+.tag{font-size:.8rem;font-weight:600;padding:2px 10px;border-radius:99px;border:1px solid currentColor;max-width:100%}
 .t-ok{color:var(--ok)}.t-warn{color:var(--warn)}.t-over{color:var(--over)}
-.acts{display:flex;gap:6px}
-.acts button{padding:6px 10px;font-size:.88rem}
+.acts{display:flex;gap:6px;flex:0 0 auto}
+.acts button{padding:6px 11px;font-size:.86rem}
 details{margin-top:8px}
 summary{cursor:pointer;color:var(--mute);font-size:.88rem}
 .h{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:8px 0;font-size:.92rem;border-bottom:1px dashed var(--line)}
 .h:last-child{border-bottom:0}
-.h .d{flex:1;min-width:120px;color:var(--mute)}
-.h button{padding:2px 8px;font-size:.8rem}
+.h .d{flex:1;min-width:110px;color:var(--mute)}
+.h button{padding:3px 9px;font-size:.8rem}
 .slip-thumb{width:54px;height:54px;object-fit:cover;border-radius:6px;border:1px solid var(--line);cursor:pointer;flex:0 0 auto}
 .nohist{color:var(--mute);font-size:.88rem;padding:6px 0}
 .empty{color:var(--mute);text-align:center;padding:20px 0}
 .foot{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;color:var(--mute);font-size:.85rem}
 .ocr-hint{font-size:.82rem;color:var(--main);margin-top:4px;min-height:1.2em}
+
+@media (max-width:520px){
+  main{padding:16px 12px 64px}
+  h1{font-size:1.6rem}
+  .big{font-size:1.85rem}
+  .card{padding:14px}
+  .meta-row{flex-direction:column;align-items:flex-start;gap:6px}
+}
 
 .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;padding:16px;z-index:50}
 .modal-bg.open{display:flex}
@@ -86,9 +124,22 @@ summary{cursor:pointer;color:var(--mute);font-size:.88rem}
   <div class="head-top">
     <div>
       <h1>เก็บค่าห้อง</h1>
-      <p class="sub">ซิงก์เรียลไทม์ แจ้งเตือนการจ่าย · เวอร์ชัน sync-13</p>
+      <p class="sub"> · เวอร์ชั่น sync-15(อยู่ช่วงพัฒนา)</p>
     </div>
     <button class="install" id="installBtn" type="button" style="display:none">📲 ติดตั้งแอป</button>
+  </div>
+
+  <div class="ui-bar">
+    <select id="themeSel" aria-label="เลือกธีมสี">
+      <option value="auto">🎨 ธีม: อัตโนมัติ</option>
+      <option value="dark">🌙 ธีม: มืด</option>
+      <option value="light">☀️ ธีม: สว่าง</option>
+      <option value="warm">☕ ธีม: โทนอุ่น</option>
+    </select>
+    <select id="layoutSel" aria-label="เลือกรูปแบบการจัดวาง">
+      <option value="comfortable">📐 ระยะห่าง: สบายตา</option>
+      <option value="compact">📋 ระยะห่าง: กะทัดรัด</option>
+    </select>
   </div>
 
   <section class="card">
@@ -167,7 +218,33 @@ summary{cursor:pointer;color:var(--mute);font-size:.88rem}
 </div>
 
 <script>
-// สร้าง Web App Manifest และ Service Worker อัตโนมัติเพื่อให้ติดตั้งเป็นแอปได้ในไฟล์เดียว
+const UI_PREF_KEY = 'rent-tracker-ui-pref-v1';
+function applyUIPrefs(pref){
+  const theme = (pref && pref.theme) || 'auto';
+  const layout = (pref && pref.layout) || 'comfortable';
+  document.documentElement.setAttribute('data-theme', theme);
+  document.documentElement.setAttribute('data-layout', layout);
+  if (document.getElementById('themeSel')) document.getElementById('themeSel').value = theme;
+  if (document.getElementById('layoutSel')) document.getElementById('layoutSel').value = layout;
+  try { localStorage.setItem(UI_PREF_KEY, JSON.stringify({ theme, layout })); } catch(e){}
+}
+(function initUIPrefs(){
+  let saved = null;
+  try { saved = JSON.parse(localStorage.getItem(UI_PREF_KEY) || 'null'); } catch(e){}
+  applyUIPrefs(saved || { theme: 'auto', layout: 'comfortable' });
+  document.getElementById('themeSel').addEventListener('change', e => {
+    const cur = JSON.parse(localStorage.getItem(UI_PREF_KEY) || '{}');
+    applyUIPrefs({ ...cur, theme: e.target.value });
+    if (typeof applyBackground === 'function') applyBackground();
+  });
+  document.getElementById('layoutSel').addEventListener('change', e => {
+    const cur = JSON.parse(localStorage.getItem(UI_PREF_KEY) || '{}');
+    applyUIPrefs({ ...cur, layout: e.target.value });
+  });
+})();
+</script>
+
+<script>
 (function setupPWA(){
   const iconSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192"><rect width="192" height="192" rx="40" fill="#1f6f5c"/><text x="96" y="122" font-size="84" text-anchor="middle" fill="#ffffff">🏠</text></svg>`;
   const iconUrl = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(iconSvg)));
@@ -195,10 +272,8 @@ summary{cursor:pointer;color:var(--mute);font-size:.88rem}
 
   if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')){
     const swCode = `
-      const CACHE_NAME = 'rent-tracker-pwa-v13';
-      self.addEventListener('install', e => {
-        self.skipWaiting();
-      });
+      const CACHE_NAME = 'rent-tracker-pwa-v15';
+      self.addEventListener('install', e => { self.skipWaiting(); });
       self.addEventListener('activate', e => {
         e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))));
         self.clients.claim();
@@ -288,9 +363,17 @@ const BACKGROUND = {
   dark:  '#121816',
   image: '833172029_1087972224142531_5479026980495393506_n.jpg',
 };
+function isDarkEffective(){
+  const mode = document.documentElement.getAttribute('data-theme') || 'auto';
+  if (mode === 'dark') return true;
+  if (mode === 'light' || mode === 'warm') return false;
+  return Boolean(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+}
 function applyBackground(){
-  const dark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-  const color = dark ? BACKGROUND.dark : BACKGROUND.light;
+  const dark = isDarkEffective();
+  const mode = document.documentElement.getAttribute('data-theme') || 'auto';
+  let color = dark ? BACKGROUND.dark : BACKGROUND.light;
+  if (mode === 'warm') color = '#f7f1e8';
   document.body.style.background = BACKGROUND.image
     ? 'url("' + BACKGROUND.image + '") center / cover fixed no-repeat, ' + color
     : color;
@@ -622,12 +705,28 @@ function render(){
       let cls = 't-warn', txt = 'ค้าง ' + fmt(diff) + ' บาท';
       if (diff === 0){ cls = 't-ok'; txt = 'จ่ายครบ'; }
       else if (diff < 0){ cls = 't-over'; txt = 'เกิน ' + fmt(-diff) + ' บาท (ยกไปเดือนหน้า)'; }
+
       const el = document.createElement('div');
       el.className = 'item';
-      el.innerHTML = '<div class="top"><div class="nm"><strong></strong><span>จ่ายแล้ว ' + fmt(paid) + (cr ? ' + ยกมา ' + fmt(cr) : '') + ' จาก ' + fmt(rent) + ' บาท</span></div>'
-        + '<span class="tag ' + cls + '">' + txt + '</span>'
-        + '<div class="acts"><button type="button" data-a="pay" data-id="' + p.id + '">จ่ายเพิ่ม</button><button type="button" data-a="del" data-id="' + p.id + '" aria-label="ลบคน">ลบ</button></div></div>'
-        + '<details' + (openDetails.has(p.id) ? ' open' : '') + ' data-id="' + p.id + '"><summary>ประวัติการจ่าย (' + hist.length + ' ครั้ง' + (slipCount ? ' · มีรูป ' + slipCount : '') + ')</summary><div class="hl"></div></details>';
+      el.innerHTML =
+        '<div class="top">'
+          + '<div class="nm">'
+            + '<strong></strong>'
+            + '<span class="sum-line">จ่ายแล้ว ' + fmt(paid) + (cr ? ' + ยกมา ' + fmt(cr) : '') + ' จาก ' + fmt(rent) + ' บาท</span>'
+          + '</div>'
+          + '<div class="acts">'
+            + '<button type="button" data-a="pay" data-id="' + p.id + '">จ่ายเพิ่ม</button>'
+            + '<button type="button" data-a="del" data-id="' + p.id + '" aria-label="ลบคน">ลบ</button>'
+          + '</div>'
+        + '</div>'
+        + '<div class="meta-row">'
+          + '<span class="tag ' + cls + '">' + txt + '</span>'
+        + '</div>'
+        + '<details' + (openDetails.has(p.id) ? ' open' : '') + ' data-id="' + p.id + '">'
+          + '<summary>ประวัติการจ่าย (' + hist.length + ' ครั้ง' + (slipCount ? ' · มีรูป ' + slipCount : '') + ')</summary>'
+          + '<div class="hl"></div>'
+        + '</details>';
+
       const sc = personScore(p.id), rk = rankOf(sc);
       const st = el.querySelector('strong');
       st.textContent = p.name;
@@ -636,10 +735,12 @@ function render(){
       badge.textContent = rk.cur.icon + ' ' + rk.cur.name;
       badge.style.color = rk.cur.color;
       st.appendChild(badge);
+
       const info = document.createElement('span');
       info.className = 'rk';
       info.textContent = 'คะแนน ' + fmt(sc) + ' ' + RANK_UNIT + (rk.next ? ' · อีก ' + fmt(rk.next.min - sc) + ' ' + RANK_UNIT + ' ถึงยศ ' + rk.next.name : ' · ยศสูงสุดแล้ว');
       el.querySelector('.nm').appendChild(info);
+
       const hl = el.querySelector('.hl');
       if (!hist.length) hl.innerHTML = '<div class="nohist">ยังไม่มีรายการจ่ายในเดือนนี้</div>';
       hist.forEach((x, k) => {
@@ -860,3 +961,4 @@ else setStatus('ยังไม่ได้ตั้งค่าออนไล�
 </script>
 </body>
 </html>
+
