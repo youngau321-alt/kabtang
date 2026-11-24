@@ -3,7 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>เก็บค่าห้อง · Real-time & OCR</title>
+<meta name="theme-color" content="#1f6f5c">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="เก็บค่าห้อง">
+<title>เก็บค่าห้อง · App</title>
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;800&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <style>
@@ -12,6 +16,7 @@
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font-family:'Sarabun',system-ui,sans-serif;line-height:1.5}
 main{max-width:720px;margin:0 auto;padding:24px 16px 64px}
+.head-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
 h1{font-size:1.9rem;font-weight:800;margin:0 0 4px}
 .sub{color:var(--mute);margin:0 0 20px}
 .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:16px}
@@ -23,6 +28,7 @@ input:focus,button:focus-visible,summary:focus-visible{outline:2px solid var(--m
 .f{flex:1;min-width:120px}
 button{font:inherit;cursor:pointer;border-radius:8px;border:1px solid var(--line);background:transparent;color:var(--ink);padding:9px 14px}
 button.p{background:var(--main);border-color:var(--main);color:#fff;font-weight:600}
+button.install{background:var(--main);border-color:var(--main);color:#fff;font-weight:600;padding:8px 13px;font-size:.9rem}
 .mnav{display:flex;align-items:center;justify-content:space-between;gap:10px}
 .mnav b{font-size:1.2rem}
 .big{font-size:2.2rem;font-weight:800;line-height:1.1}
@@ -67,7 +73,6 @@ summary{cursor:pointer;color:var(--mute);font-size:.88rem}
 .lb-bg.open{display:flex}
 .lb-bg img{max-width:95vw;max-height:90vh;border-radius:10px;box-shadow:0 8px 28px rgba(0,0,0,.5)}
 
-/* แจ้งเตือนเรียลไทม์มุมขวาบน */
 .toast-wrap{position:fixed;top:16px;right:16px;display:flex;flex-direction:column;gap:8px;z-index:80;max-width:min(360px,calc(100vw - 32px))}
 .toast{background:var(--card);border:1px solid var(--main);border-left:5px solid var(--main);border-radius:10px;padding:10px 14px;box-shadow:0 8px 24px rgba(0,0,0,.18);font-size:.9rem;animation:fadeIn .2s ease}
 .toast b{display:block;color:var(--main);margin-bottom:2px}
@@ -78,8 +83,13 @@ summary{cursor:pointer;color:var(--mute);font-size:.88rem}
 <div class="toast-wrap" id="toasts" aria-live="polite"></div>
 
 <main>
-  <h1>เก็บค่าห้อง</h1>
-  <p class="sub">ซิงก์เรียลไทม์ แจ้งเตือนการจ่าย และอ่านยอดจากสลิปอัตโนมัติ · เวอร์ชัน sync-11</p>
+  <div class="head-top">
+    <div>
+      <h1>เก็บค่าห้อง</h1>
+      <p class="sub">ซิงก์เรียลไทม์ แจ้งเตือนการจ่าย · เวอร์ชัน sync-13</p>
+    </div>
+    <button class="install" id="installBtn" type="button" style="display:none">📲 ติดตั้งแอป</button>
+  </div>
 
   <section class="card">
     <div class="mnav">
@@ -113,7 +123,7 @@ summary{cursor:pointer;color:var(--mute);font-size:.88rem}
         <input id="amt" type="number" min="0" step="any" value="0">
         <div class="ocr-hint" id="addOcrHint"></div>
       </div>
-      <div class="f" style="flex:1.6"><label for="addSlip">แนบรูปสลิป (อ่านยอดให้อาจะไม่ตรงแต่กำลังพัฒนาอยู่)</label><input id="addSlip" type="file" accept="image/*"></div>
+      <div class="f" style="flex:1.6"><label for="addSlip">แนบรูปสลิป (อ่านยอดให้)</label><input id="addSlip" type="file" accept="image/*"></div>
       <button class="p" id="add" type="button">เพิ่มคน</button>
     </div>
   </section>
@@ -123,6 +133,7 @@ summary{cursor:pointer;color:var(--mute);font-size:.88rem}
   <div class="foot">
     <span id="status"></span>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button id="syncBtn" type="button">🔄 ซิงก์ตอนนี้</button>
       <button id="soundBtn" type="button">🔔 เสียงเตือน: เปิด</button>
       <button id="reset" type="button">ล้างยอดเดือนนี้</button>
     </div>
@@ -156,6 +167,82 @@ summary{cursor:pointer;color:var(--mute);font-size:.88rem}
 </div>
 
 <script>
+// สร้าง Web App Manifest และ Service Worker อัตโนมัติเพื่อให้ติดตั้งเป็นแอปได้ในไฟล์เดียว
+(function setupPWA(){
+  const iconSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192"><rect width="192" height="192" rx="40" fill="#1f6f5c"/><text x="96" y="122" font-size="84" text-anchor="middle" fill="#ffffff">🏠</text></svg>`;
+  const iconUrl = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(iconSvg)));
+
+  const appleLink = document.createElement('link');
+  appleLink.rel = 'apple-touch-icon';
+  appleLink.href = iconUrl;
+  document.head.appendChild(appleLink);
+
+  const manifest = {
+    name: 'เก็บค่าห้อง',
+    short_name: 'เก็บค่าห้อง',
+    start_url: './',
+    scope: './',
+    display: 'standalone',
+    background_color: '#121816',
+    theme_color: '#1f6f5c',
+    icons: [{ src: iconUrl, sizes: '192x192', type: 'image/svg+xml', purpose: 'any maskable' }]
+  };
+  const manifestBlob = new Blob([JSON.stringify(manifest)], { type: 'application/manifest+json' });
+  const manifestLink = document.createElement('link');
+  manifestLink.rel = 'manifest';
+  manifestLink.href = URL.createObjectURL(manifestBlob);
+  document.head.appendChild(manifestLink);
+
+  if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')){
+    const swCode = `
+      const CACHE_NAME = 'rent-tracker-pwa-v13';
+      self.addEventListener('install', e => {
+        self.skipWaiting();
+      });
+      self.addEventListener('activate', e => {
+        e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))));
+        self.clients.claim();
+      });
+      self.addEventListener('fetch', e => {
+        if (e.request.method !== 'GET') return;
+        const url = new URL(e.request.url);
+        if (url.hostname.includes('firebasedatabase.app')) return;
+        e.respondWith(
+          fetch(e.request).then(res => {
+            if (res && res.status === 200 && url.origin === location.origin){
+              const copy = res.clone();
+              caches.open(CACHE_NAME).then(c => c.put(e.request, copy));
+            }
+            return res;
+          }).catch(() => caches.match(e.request))
+        );
+      });
+    `;
+    const swBlob = new Blob([swCode], { type: 'application/javascript' });
+    navigator.serviceWorker.register(URL.createObjectURL(swBlob)).catch(() => {});
+  }
+})();
+
+let deferredInstallPrompt = null;
+const installBtn = document.getElementById('installBtn');
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  deferredInstallPrompt = e;
+  installBtn.style.display = 'inline-block';
+});
+installBtn.addEventListener('click', async () => {
+  if (!deferredInstallPrompt) return;
+  deferredInstallPrompt.prompt();
+  await deferredInstallPrompt.userChoice;
+  deferredInstallPrompt = null;
+  installBtn.style.display = 'none';
+});
+window.addEventListener('appinstalled', () => {
+  installBtn.style.display = 'none';
+});
+</script>
+
+<script>
 const KEY = 'rent-tracker-v2';
 const OLD_KEY = 'rent-tracker-v1';
 const $ = id => document.getElementById(id);
@@ -169,7 +256,6 @@ let initializedStream = false;
 const DB_URL = 'https://money-6f16c-default-rtdb.asia-southeast1.firebasedatabase.app';
 const DB_PATH = '/rent2.json';
 
-/* ================= ตั้งค่าระบบยศ (แก้ตรงนี้ได้เลย) ================= */
 const RANK_BY = 'total';
 const RANK_UNIT = RANK_BY === 'months' ? 'เดือน' : 'บาท';
 const RANKS = [
@@ -196,9 +282,7 @@ function rankOf(score){
   RANKS.forEach((r, k) => { if (score >= r.min) i = k; });
   return { cur: RANKS[i], next: RANKS[i+1] || null };
 }
-/* ================================================================ */
 
-/* ================= ตั้งค่าพื้นหลัง (แก้ตรงนี้ได้เลย) ================= */
 const BACKGROUND = {
   light: '#f3f6f4',
   dark:  '#121816',
@@ -214,7 +298,6 @@ function applyBackground(){
 if (window.matchMedia) {
   window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyBackground);
 }
-/* ================================================================ */
 
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,6);
 const nowMonth = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0'); };
@@ -283,29 +366,24 @@ function compressImage(file, maxWidth = 600, quality = 0.65){
   });
 }
 
-// อ่านตัวเลขยอดเงินจากรูปสลิปด้วย Tesseract OCR
 function extractAmountFromText(rawText){
   if (!rawText) return null;
   const cleaned = rawText
     .replace(/บาท|THB|฿|จำนวนเงิน|ยอดโอน|ยอดเงิน/gi, ' ')
     .replace(/O(?=\d)/g, '0')
     .replace(/(?<=\d)O/g, '0');
-
-  // จับตัวเลขที่มีทศนิยมหรือคั่นหลักพัน เช่น 1,500.00 หรือ 3000 หรือ 1250.50
   const matches = [...cleaned.matchAll(/\b(\d{1,3}(?:,\d{3})+|\d+)(?:\.(\d{1,2}))?\b/g)];
   const candidates = [];
   for (const m of matches){
     const intPart = Number(m[1].replace(/,/g, ''));
     const decPart = m[2] ? Number('0.' + m[2]) : 0;
     const val = intPart + decPart;
-    // กรองปี พ.ศ./ค.ศ. 4 หลักล้วนๆ ที่ไม่มีจุดทศนิยมและไม่มีคอมม่า ถ้ามีตัวเลือกอื่น
     if (val > 0 && val < 1000000){
       const isPlainYear = !m[1].includes(',') && !m[2] && val >= 2500 && val <= 2575;
       candidates.push({ val, isPlainYear, hasDecimalOrComma: Boolean(m[2] || m[1].includes(',')) });
     }
   }
   if (!candidates.length) return null;
-  // ให้ความสำคัญกับเลขที่มีทศนิยม/คอมม่า หรือไม่ใช่เลขปี พ.ศ.
   const filtered = candidates.filter(c => !c.isPlainYear);
   const pool = filtered.length ? filtered : candidates;
   const decimalPool = pool.filter(c => c.hasDecimalOrComma);
@@ -382,7 +460,6 @@ function errMsg(e){
 }
 function setStatus(t){ $('status').textContent = t; }
 
-// ตรวจจับการจ่ายเงินที่เพิ่มขึ้นเมื่อมีข้อมูลใหม่เข้ามา เพื่อแจ้งเตือนผู้ใช้
 function notifyNewPayments(prevState, nextState){
   if (!initializedStream) return;
   const pplMap = new Map((nextState.people || []).map(p => [p.id, p.name]));
@@ -430,21 +507,27 @@ function save(){
   if (!DB_URL) return;
   dirty++;
   setStatus('กำลังบันทึกเรียลไทม์...');
-  fetch(DB_URL + DB_PATH, { method:'PUT', body: JSON.stringify(state) })
+  fetch(DB_URL + DB_PATH, {
+    method:'PUT',
+    cache:'no-store',
+    body: JSON.stringify(state)
+  })
     .then(r => { if (!r.ok) throw r.status; setStatus('เรียลไทม์: บันทึกล่าสุดแล้ว'); })
     .catch(e => setStatus(errMsg(e)))
     .finally(() => { dirty = Math.max(0, dirty - 1); });
 }
 
-async function pull(){
-  if (!DB_URL || dirty > 0) return;
+async function pull(force = false){
+  if (!DB_URL || (dirty > 0 && !force)) return;
   try {
-    const r = await fetch(DB_URL + DB_PATH);
+    const sep = DB_PATH.includes('?') ? '&' : '?';
+    const r = await fetch(DB_URL + DB_PATH + sep + '_t=' + Date.now(), { cache: 'no-store' });
     if (!r.ok) throw r.status;
     const d = await r.json();
-    if (dirty > 0) return;
+    if (dirty > 0 && !force) return;
     if (d && !d.error){
       applyRemoteData(d);
+      render();
     } else if (!d && state.people.length){
       initializedStream = true;
       save();
@@ -452,11 +535,11 @@ async function pull(){
     } else {
       initializedStream = true;
     }
-    setStatus('เรียลไทม์ออนไลน์อยู่ · เตือนอัตโนมัติเมื่อมียอดเข้า');
+    const nowTime = new Date().toLocaleTimeString('th-TH', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+    setStatus('เรียลไทม์ออนไลน์อยู่ · ซิงก์ล่าสุด ' + nowTime);
   } catch(e){ setStatus(errMsg(e)); }
 }
 
-// เชื่อมต่อ Firebase Realtime Database แบบ SSE Streaming เพื่อรับอัปเดตทันที
 function startRealtimeStream(){
   if (!DB_URL || typeof EventSource === 'undefined') return;
   try {
@@ -475,9 +558,6 @@ function startRealtimeStream(){
     es.addEventListener('patch', () => {
       if (dirty <= 0) pull();
     });
-    es.onerror = () => {
-      // พึ่งพา pull สำรองเมื่อเครือข่ายสะดุด
-    };
   } catch(e){}
 }
 
@@ -697,7 +777,7 @@ $('paySave').addEventListener('click', () => {
   if (!pendingPayUserId) return;
   const n = Math.max(0, Number($('payAmt').value) || 0);
   if (n <= 0 && !pendingPayImg){
-    alert('กรุณากรอกยอดเงินหรือแนบรูปสลิปอาจะไม่ตรงแต่กำลังพัฒนาอยู่');
+    alert('กรุณากรอกยอดเงินหรือแนบรูปสลิป');
     return;
   }
   addPay(pendingPayUserId, n, pendingPayImg);
@@ -705,6 +785,11 @@ $('paySave').addEventListener('click', () => {
   closePayModal();
   render();
   save();
+});
+
+$('syncBtn').addEventListener('click', () => {
+  setStatus('กำลังซิงก์ข้อมูลล่าสุด...');
+  pull(true);
 });
 
 $('soundBtn').addEventListener('click', () => {
@@ -766,9 +851,10 @@ load();
 applyBackground();
 render();
 if (DB_URL){
-  pull().then(() => { startRealtimeStream(); });
-  setInterval(pull, 5000);
-  document.addEventListener('visibilitychange', () => { if (!document.hidden) pull(); });
+  pull(true).then(() => { startRealtimeStream(); });
+  setInterval(() => pull(false), 3000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) pull(true); });
+  window.addEventListener('focus', () => pull(true));
 }
 else setStatus('ยังไม่ได้ตั้งค่าออนไลน์ ข้อมูลเก็บในเครื่องนี้เท่านั้น');
 </script>
